@@ -1,0 +1,7 @@
+
+
+osascript -e 'tell application "Terminal" to do script "cd ~/cs271/project1/ && python test.py Server"'
+osascript -e 'tell application "Terminal" to do script "cd ~/cs271/project1/ && python test.py Client1"'
+osascript -e 'tell application "Terminal" to do script "cd ~/cs271/project1/ && python test.py Client2"'
+osascript -e 'tell application "Terminal" to do script "cd ~/cs271/project1/ && python test.py Client3"'
+

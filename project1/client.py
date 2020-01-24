@@ -5,6 +5,7 @@ import thread
 import multiprocessing
 import heapq
 import time
+from random import randrange
 
 myname = ''
 
@@ -18,7 +19,7 @@ def pipeThread(pipe, socketForServer, socketsForClients):
         thread.startTemp(sendMsg, (s, reply,))
         
     def sendMsg(s, reply):
-        time.sleep(5)
+        time.sleep(randrange(5))
         s.send(','.join(reply).encode())
     
     def getNewClock():
@@ -59,6 +60,7 @@ def pipeThread(pipe, socketForServer, socketsForClients):
                 elif msg == 'RELEASE':
                     # delete earliest transaction
                     heapq.heappop(transactionQueue)
+                print('---', transactionQueue)
                 if transactionQueue:
                     # check enough reply
                     clock, client, command = transactionQueue[0]
@@ -69,6 +71,7 @@ def pipeThread(pipe, socketForServer, socketsForClients):
                                 heapq.heappop(replyQueue)
                             # get grant, send to server
                             data = (client, command)
+                            print('************ Get Grant for:', clock, command, " ************")
                             socketForServer.send(','.join(data).encode())
             else:
                 # get request from peer

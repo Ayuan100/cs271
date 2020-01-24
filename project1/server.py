@@ -48,10 +48,16 @@ def recvThread(s):
         if not data:
             s.close()
             break
-        owner, msg = data.split(',')
-        result = process(owner, msg)
-        print('send result:', result)
-        s.send(result.encode())
+        try:
+            owner, msg = data.split(',')
+            result = process(owner, msg)
+            print('send result:', result)
+            s.send(result.encode())
+        except:
+            print(f"Something went wrong....oops...")
+            s.send('EXCEPTION'.encode())
+            continue
+
 
 def main():
     data = common.readjson()

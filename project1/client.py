@@ -9,17 +9,34 @@ from random import randrange
 
 myname = ''
 
-def pipeThread(pipe, socketForServer, socketsForClients):
-    replyQueue = []
+def sendPeerMessage(pipe, s):
+    while True:
+        msg = pipe.recv()
+        time.sleep(randrange(5))
+        print('sendPeerMessage:', msg)
+        s.send((','.join(msg)+'|').encode())
+def pipeThread(pipe, socketForServer, socketsForClients, send_pipes_sockets):
+    replyDict = {}
     transactionQueue = []
     gclock = 0
  
-    def sendToPeer(s, msg):
-        reply = (str(getNewClock()), myname, msg)
-        thread.startTemp(sendMsg, (s, reply,))
+    # def sendToPeer1(s, msg):
+    #     reply = (str(getNewClock()), myname, msg)
+    #     thread.startTemp(sendMsg, (s, reply,))
         
+    def sendToPeer(s, msg):
+
+        reply = (str(getNewClock()), myname, msg)
+        for p in send_pipes_sockets:
+            # print(p[0]==s, p[0], s)
+            # print(p[0].getpeername()[1], s.getpeername()[1])
+
+            if p[0].getpeername()[1] == s.getpeername()[1]:
+                p[1].send(reply)
+                break
+
     def sendMsg(s, reply):
-        time.sleep(randrange(5))
+        time.sleep(5)
         s.send(','.join(reply).encode())
     
     def getNewClock():
@@ -30,15 +47,34 @@ def pipeThread(pipe, socketForServer, socketsForClients):
         nonlocal gclock
         gclock = max(gclock, receivedlock)
 
+    def checkReply():
+        if transactionQueue:
+            # check enough reply
+            clock, client, command = transactionQueue[0]
+            if client == myname:
+                count = 0
+                for c in replyDict:
+                    if len(replyDict[c]) > 0:
+                        count += 1
+                if count >= len(socketsForClients):
+                    heapq.heappop(transactionQueue)
+                    for c in replyDict:
+                        heapq.heappop(replyDict[c])
+                    # get grant, send to server
+                    data = (client, command)
+                    print('************ Get Grant for:', clock, command, " ************")
+                    socketForServer.send(','.join(data).encode())
     while True:
         src, msg, clock, s =  pipe.recv()
-        # print('pipe recev:', src, msg, clock)
-
+        print('pipe recev:', src, msg, clock)
+        print('QUEUE:', transactionQueue)
+        print('REPLY:', replyDict)
         if src == "server":
             # case 1: receive RELEASE from server
             # send release to peers
             for peer in socketsForClients:
                 sendToPeer(peer, 'RELEASE')
+            checkReply()
         elif src == "input":
             # case 2: get user input
             transaction = (getNewClock(), myname, msg)
@@ -47,32 +83,24 @@ def pipeThread(pipe, socketForServer, socketsForClients):
             # send request to peers
             for s in socketsForClients:
                 sendToPeer(s, msg)
-        else:
+        else: 
             # case 3: get msg from peer
             clock = int(clock)
             syncClock(clock)
-            # print('QUEUE:', transactionQueue)
-
-            if msg == 'REPLY' or msg == 'RELEASE':
-                if msg == 'REPLY':
-                    # put into reply queue
-                    heapq.heappush(replyQueue, clock)
-                elif msg == 'RELEASE':
-                    # delete earliest transaction
-                    heapq.heappop(transactionQueue)
-                print('---', transactionQueue)
-                if transactionQueue:
-                    # check enough reply
-                    clock, client, command = transactionQueue[0]
-                    if client == myname:
-                        if len(replyQueue) >= len(socketsForClients):
-                            heapq.heappop(transactionQueue)
-                            for s in socketsForClients:
-                                heapq.heappop(replyQueue)
-                            # get grant, send to server
-                            data = (client, command)
-                            print('************ Get Grant for:', clock, command, " ************")
-                            socketForServer.send(','.join(data).encode())
+            if msg == 'REPLY':
+                # put into reply queue
+                if src not in replyDict:
+                    replyDict[src] = []
+                heapq.heappush(replyDict[src], clock)
+                # print(replyDict)
+                checkReply()
+            elif msg == 'RELEASE':
+                # delete earliest transaction
+                if transactionQueue[0][1] == myname:
+                    print('something wrong!!!!!!!!!!!')
+                heapq.heappop(transactionQueue)
+                # print('----pop')
+                checkReply()
             else:
                 # get request from peer
                 transaction = (clock, src, msg)
@@ -112,8 +140,11 @@ def receivePeerMessage(pipe, s):
         if not data:
             s.close()
             break
-        clock, sender, msg = data.split(',')
-        pipe.send((sender, msg, clock, s))
+        messages = data.split('|')
+        for info in messages:
+            if info:
+                clock, sender, msg = info.split(',')
+                pipe.send((sender, msg, clock, s))
                 
 def connect(ip, port, clientname):
     print('try to connect:', ip, port, clientname)
@@ -184,17 +215,31 @@ def main():
 
     # finish connecting
     # ******************************************
-    send_pipe, recv_pipe = multiprocessing.Pipe()
-
-    thread.startThread(pipeThread, (recv_pipe, socketForServer, socketsForClients))
-
-    # start threads for socket
-    thread.startThread(receiveServerMessage, (send_pipe, socketForServer))
+    send_pipe_process, recv_pipe_process = multiprocessing.Pipe()
+    send_pipes_sockets = []
+    recv_pipes_sockets = []
     for s in socketsForClients:
-        thread.startThread(receivePeerMessage, (send_pipe, s))
+        send_pipe_socket, recv_pipe_socket = multiprocessing.Pipe()
+        send_pipes_sockets.append((s, send_pipe_socket))
+        recv_pipes_sockets.append(recv_pipe_socket)
+
+    # print(socketsForClients)
+    # print(send_pipes_sockets)
+    thread.startThread(pipeThread, (recv_pipe_process, socketForServer, socketsForClients, send_pipes_sockets))
+
+    # start threads for receive/send message
+    thread.startThread(receiveServerMessage, (send_pipe_process, socketForServer))
+    
+    i = 0
+    for s in socketsForClients:
+        thread.startThread(receivePeerMessage, (send_pipe_process, s, ))
+        thread.startThread(sendPeerMessage, (recv_pipes_sockets[i], s,))
+        i += 1
+
+
 
     # read keyboard
-    getInput(send_pipe)
+    getInput(send_pipe_process)
     
     
 

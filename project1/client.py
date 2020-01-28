@@ -19,6 +19,7 @@ def pipeThread(pipe, socketForServer, socketsForClients, send_pipes_sockets):
     replyDict = {}
     transactionQueue = []
     gclock = 0
+    isOngoing = False
  
     # def sendToPeer1(s, msg):
     #     reply = (str(getNewClock()), myname, msg)
@@ -64,6 +65,7 @@ def pipeThread(pipe, socketForServer, socketsForClients, send_pipes_sockets):
                     data = (client, command)
                     print('************ Get Grant for:', clock, command, " ************")
                     socketForServer.send(','.join(data).encode())
+                    return True
     while True:
         src, msg, clock, s =  pipe.recv()
         print('pipe recev:', src, msg, clock)
@@ -74,7 +76,7 @@ def pipeThread(pipe, socketForServer, socketsForClients, send_pipes_sockets):
             # send release to peers
             for peer in socketsForClients:
                 sendToPeer(peer, 'RELEASE')
-            checkReply()
+            isOngoing = checkReply()
         elif src == "input":
             # case 2: get user input
             transaction = (getNewClock(), myname, msg)
@@ -93,14 +95,16 @@ def pipeThread(pipe, socketForServer, socketsForClients, send_pipes_sockets):
                     replyDict[src] = []
                 heapq.heappush(replyDict[src], clock)
                 # print(replyDict)
-                checkReply()
+                if not isOngoing:
+                    checkReply()
             elif msg == 'RELEASE':
                 # delete earliest transaction
                 if transactionQueue[0][1] == myname:
                     print('something wrong!!!!!!!!!!!')
                 heapq.heappop(transactionQueue)
                 # print('----pop')
-                checkReply()
+                if not isOngoing:
+                    checkReply()
             else:
                 # get request from peer
                 transaction = (clock, src, msg)

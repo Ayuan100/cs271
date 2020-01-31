@@ -1,0 +1,19 @@
+{
+    "clients": [
+        {
+            "name"  : "1",
+            "ip"    : "localhost",
+            "port"  : 50001
+        },
+        {
+            "name"  : "2",
+            "ip"    : "localhost",
+            "port"  : 50002
+        },
+        {
+            "name"  : "3",
+            "ip"    : "localhost",
+            "port"  : 50003
+        }
+    ]
+}

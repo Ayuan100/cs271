@@ -51,20 +51,25 @@ def recvPeerMessage(s, peername):
         # update TT and log
         otherTT, log = data
         with data_lock:
-            updateTT(otherTT, peername)
-            # update log
-            # ???? performance
+            # update log according to TT
             for t in log:
-                if t not in blockchain:
+                clock, sender, receiver, amount = t
+                # I haven't learn clock from sender
+                if TT[int(myname)-1][int(sender)-1] < clock:
                     blockchain.append(t)
+            # update time table
+            updateTT(otherTT, peername)
+            
 
 def updateTT(otherTT, owner):
     NUM = len(TT)
+    # update to max
     for j in range(NUM):
         for k in range(NUM):
             TT[j][k] = max(TT[j][k], otherTT[j][k])
     i = int(myname)-1
     k = int(owner)-1
+    # update my own row(as I have learned logs from k)
     for j in range(NUM):
         TT[i][j] = max(TT[i][j], otherTT[k][j])
 

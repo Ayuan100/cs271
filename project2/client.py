@@ -117,6 +117,7 @@ def getInput(peers):
         elif command[0] == 'T' and len(command) == 3:
             # transaction
             c, recevier, amount = command
+            amount = int(amount)
             with data_lock:
                 balance = getBalance(myname)
                 if balance >= amount:
@@ -124,14 +125,15 @@ def getInput(peers):
                     global gclock
                     gclock += 1
                     # update log
-                    blockchain.append((gclock, myname, recevier, int(amount)))
+                    blockchain.append((gclock, myname, recevier, amount))
                     # update TT
                     TT[int(myname)-1][int(myname)-1] = gclock
             if balance >= amount:
                 print("Transaction Completed")
             else:
                 print("Not Enough Balance!")
-
+        elif command[0] == 'log':
+            print(blockchain)
         else:
             print('WRONG COMMAND!')
 

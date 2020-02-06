@@ -73,6 +73,16 @@ def updateTT(otherTT, owner):
     for j in range(NUM):
         TT[i][j] = max(TT[i][j], otherTT[k][j])
 
+def getBalance(owner):
+    balance = 10   
+    for t in blockchain:
+        clock, sender, receiver, amount = t
+        if sender == owner:
+            balance -= amount
+        if receiver == owner:
+            balance += amount
+    return balance
+
 def getInput(peers):
     EXIT_COMMAND = "exit"
     print('Ready for keyboard input:')
@@ -102,25 +112,26 @@ def getInput(peers):
             # get balance
             balance = 10
             with data_lock:
-                for t in blockchain:
-                    clock, sender, receiver, amount = t
-                    if sender == owner:
-                        balance -= amount
-                    if receiver == owner:
-                        balance += amount
+                balance = getBalance(owner)
             print('Balance of client', owner, 'is :', balance)
         elif command[0] == 'T' and len(command) == 3:
             # transaction
             c, recevier, amount = command
             with data_lock:
-                # update clock
-                global gclock
-                gclock += 1
-                # update log
-                blockchain.append((gclock, myname, recevier, int(amount)))
-                # update TT
-                TT[int(myname)-1][int(myname)-1] = gclock
-            print("Transaction Completed")
+                balance = getBalance(myname)
+                if balance >= amount:
+                    # update clock
+                    global gclock
+                    gclock += 1
+                    # update log
+                    blockchain.append((gclock, myname, recevier, int(amount)))
+                    # update TT
+                    TT[int(myname)-1][int(myname)-1] = gclock
+            if balance >= amount:
+                print("Transaction Completed")
+            else:
+                print("Not Enough Balance!")
+
         else:
             print('WRONG COMMAND!')
 
